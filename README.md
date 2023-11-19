@@ -4,6 +4,10 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 
+String getFormattedUID(MFRC522::Uid uid);
+
+
+
 #define SS_PIN    5    // ESP32 pin GPIO5
 #define RST_PIN   27   // ESP32 pin GPIO27
 #define BUZZER_PIN 22   // Buzzer pin
@@ -15,8 +19,8 @@
 MFRC522 rfid(SS_PIN, RST_PIN);
 Servo_ESP32 gateServo;
 
-const char* ssid = "Shubham";
-const char* password = "123456789";
+const char* ssid = "Khushi";
+const char* password = "47273ECECD9E";
 
 AsyncWebServer server(80);
 
@@ -26,6 +30,16 @@ bool redLEDOn = false;
 bool gateOpen = false; // Track gate state
 unsigned long gateOpenTime = 0;
 const unsigned long gateOpenDuration = 10000; // 10 seconds
+
+// Function definition
+String getFormattedUID(MFRC522::Uid uid) {
+  String formattedUID = "";
+  for (int i = 0; i < uid.size; i++) {
+    formattedUID += (uid.uidByte[i] < 0x10 ? " 0" : " ");
+    formattedUID += String(uid.uidByte[i], HEX);
+  }
+  return formattedUID;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -53,43 +67,64 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    String html = "<html><head>";
-    html += "<style>";
-    html += ".button { width: 100px; height: 100px; font-size: 20px; transition: background-color 0.3s; }";
-    html += ".button:hover { background-color: darkgrey; }";
-    html += ".button:active { background-color: darkred; }";
-    html += "</style>";
-    html += "</head><body>";
-    html += "<h1>RFID Gate Control</h1>";
-    html += "Gate is: <span id='gateStatus'>Unknown</span><br>";
-    html += "Time remaining: <span id='timer'>0 seconds</span><br>";
-    html += "<button class='button' style='background-color: green;' onclick='openGate()'>Open</button>";
-    html += "<button class='button' style='background-color: red;' onclick='closeGate()'>Close</button>";
-    html += "<button class='button' style='background-color: blue;' onclick='resetSystem()'>Reset</button>";
-    html += "<script>";
-    html += "function updateStatus() {";
-    html += "fetch('/status')";
-    html += ".then(response => response.json())";
-    html += ".then(data => {";
-    html += "document.getElementById('gateStatus').textContent = data.status;";
-    html += "document.getElementById('timer').textContent = 'Time remaining: ' + data.remainingTime + ' seconds';";
-    html += "});";
-    html += "}";
-    html += "function openGate() {";
-    html += "fetch('/open');";
-    html += "}";
-    html += "function closeGate() {";
-    html += "fetch('/close');";
-    html += "}";
-    html += "function resetSystem() {";
-    html += "fetch('/reset');";
-    html += "}";
-    html += "updateStatus();";
-    html += "setInterval(updateStatus, 2000);"; // Update every 2 seconds
-    html += "</script>";
-    html += "</body></html>";
-    request->send(200, "text/html", html);
-  });
+  String html = "<html><head>";
+  html += "<style>";
+  html += ".button { width: 100px; height: 100px; font-size: 20px; transition: background-color 0.3s; }";
+  html += ".button:hover { background-color: darkgrey; }";
+  html += ".button:active { background-color: darkred; }";
+  html += ".message { font-size: 24px; font-weight: bold; }"; // New style for the message
+  html += "</style>";
+  html += "</head><body>";
+  html += "<h1>RFID Gate Control</h1>";
+  html += "<span class='message' id='statusMessage'></span><br>"; // New span for the message
+  html += "Gate is: <span id='gateStatus'>Unknown</span><br>";
+  html += "Time remaining: <span id='timer'>0 seconds</span><br>";
+  html += "<button class='button' style='background-color: green;' onclick='openGate()'>Open</button>";
+  html += "<button class='button' style='background-color: red;' onclick='closeGate()'>Close</button>";
+  html += "<button class='button' style='background-color: blue;' onclick='resetSystem()'>Reset</button>";
+  html += "<script>";
+  html += "function updateStatus() {";
+  html += "fetch('/status')";
+  html += ".then(response => response.json())";
+  html += ".then(data => {";
+  html += "document.getElementById('gateStatus').textContent = data.status;";
+  html += "document.getElementById('timer').textContent = 'Time remaining: ' + data.remainingTime + ' seconds';";
+  html += "if (data.message) document.getElementById('statusMessage').innerHTML = data.message;"; // New line for updating the message
+  html += "});";
+  html += "}";
+  html += "function openGate() {";
+  html += "fetch('/open');";
+  html += "}";
+  html += "function closeGate() {";
+  html += "fetch('/close');";
+  html += "}";
+  html += "function resetSystem() {";
+  html += "fetch('/reset');";
+  html += "}";
+  html += "updateStatus();";
+  html += "setInterval(updateStatus, 2000);"; // Update every 2 seconds
+  html += "</script>";
+  html += "</body></html>";
+  request->send(200, "text/html", html);
+});
+
+// ...
+
+server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
+  String status = gateOpen ? "Open" : "Closed";
+  unsigned long currentTime = millis();
+  unsigned long remainingTime = gateOpen ? (currentTime - gateOpenTime > gateOpenDuration ? 0 : gateOpenDuration - (currentTime - gateOpenTime)) : 0;
+
+  String message = "";
+if (isAuthorized(rfid.uid)) {
+  message = "<span class='message' style='color: green; font-weight: bold;'>Welcome! Access granted. UID: " + getFormattedUID(rfid.uid) + "</span>";
+} else {
+  message = "<span class='message' style='color: red; font-weight: bold;'>Intruder alert! Unauthorized access. UID: " + getFormattedUID(rfid.uid) + "</span>";
+}
+
+  String json = "{\"status\":\"" + status + "\",\"remainingTime\":" + String(remainingTime / 1000) + ",\"message\":\"" + message + "\"}";
+  request->send(200, "application/json", json);
+});
 
   server.on("/open", HTTP_GET, [](AsyncWebServerRequest *request){
     openGate();
@@ -104,14 +139,6 @@ void setup() {
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request){
     resetSystem();
     request->send(200, "text/plain", "System reset.");
-  });
-
-  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
-    String status = gateOpen ? "Open" : "Closed";
-    unsigned long currentTime = millis();
-    unsigned long remainingTime = gateOpen ? (currentTime - gateOpenTime > gateOpenDuration ? 0 : gateOpenDuration - (currentTime - gateOpenTime)) : 0;
-    String json = "{\"status\":\"" + status + "\",\"remainingTime\":" + String(remainingTime / 1000) + "}";
-    request->send(200, "application/json", json);
   });
 
   server.begin();
