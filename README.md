@@ -66,49 +66,88 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  // ... (existing code)
+
+server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
   String html = "<html><head>";
   html += "<style>";
-  html += ".button { width: 100px; height: 100px; font-size: 20px; transition: background-color 0.3s; }";
-  html += ".button:hover { background-color: darkgrey; }";
-  html += ".button:active { background-color: darkred; }";
-  html += ".message { font-size: 24px; font-weight: bold; }"; // New style for the message
+  html += "body {";
+  html += "  display: flex;";
+  html += "  align-items: center;";
+  html += "  justify-content: center;";
+  html += "  height: 100vh;";
+  html += "  margin: 0;";
+  html += "  background-color: #f0f0f0;";
+  html += "}";
+  html += ".container {";
+  html += "  border: 2px solid #3498db;";
+  html += "  padding: 20px;";
+  html += "  border-radius: 10px;";
+  html += "}";
+  html += ".button {";
+  html += "  width: 100px;";
+  html += "  height: 100px;";
+  html += "  font-size: 20px;";
+  html += "  margin: 10px;";
+  html += "  transition: background-color 0.3s;";
+  html += "}";
+  html += ".button:hover {";
+  html += "  background-color: darkgrey;";
+  html += "}";
+  html += ".button:active {";
+  html += "  background-color: darkred;";
+  html += "}";
+  html += ".message {";
+  html += "  font-size: 24px;";
+  html += "  font-weight: bold;";
+  html += "  margin-bottom: 10px;";
+  html += "}";
+  html += ".status {";
+  html += "  font-size: 18px;";
+  html += "  font-weight: bold;";
+  html += "  margin-bottom: 10px;";
+  html += "}";
   html += "</style>";
   html += "</head><body>";
-  html += "<h1>RFID Gate Control</h1>";
-  html += "<span class='message' id='statusMessage'></span><br>"; // New span for the message
-  html += "Gate is: <span id='gateStatus'>Unknown</span><br>";
-  html += "Time remaining: <span id='timer'>0 seconds</span><br>";
+  html += "<div class='container'>";
+  html += "<h1 style='text-align: center;'>RFID Gate Control</h1>";
+  html += "<div class='status' id='statusMessage'></div>";
+  html += "<div>Gate is: <span id='gateStatus'>Unknown</span></div>";
+  html += "<div>Time remaining: <span id='timer'>0 seconds</span></div>";
   html += "<button class='button' style='background-color: green;' onclick='openGate()'>Open</button>";
   html += "<button class='button' style='background-color: red;' onclick='closeGate()'>Close</button>";
   html += "<button class='button' style='background-color: blue;' onclick='resetSystem()'>Reset</button>";
+  
+html += "<div style='text-align: center; margin-top: 20px; border: 2px solid #3498db; padding: 10px; border-radius: 10px;'>";
+html += "<a href='http://192.168.1.177/mjpeg/1' target='_blank' style='font-size: 18px;'>Watch Live Streaming Video</a>";
+html += "</div>";
+  html += "</div>";
   html += "<script>";
   html += "function updateStatus() {";
-  html += "fetch('/status')";
-  html += ".then(response => response.json())";
-  html += ".then(data => {";
-  html += "document.getElementById('gateStatus').textContent = data.status;";
-  html += "document.getElementById('timer').textContent = 'Time remaining: ' + data.remainingTime + ' seconds';";
-  html += "if (data.message) document.getElementById('statusMessage').innerHTML = data.message;"; // New line for updating the message
-  html += "});";
+  html += "  fetch('/status')";
+  html += "  .then(response => response.json())";
+  html += "  .then(data => {";
+  html += "    document.getElementById('gateStatus').textContent = data.status;";
+  html += "    document.getElementById('timer').textContent = 'Time remaining: ' + data.remainingTime + ' seconds';";
+  html += "    document.getElementById('statusMessage').innerHTML = data.message;";
+  html += "  });";
   html += "}";
   html += "function openGate() {";
-  html += "fetch('/open');";
+  html += "  fetch('/open');";
   html += "}";
   html += "function closeGate() {";
-  html += "fetch('/close');";
+  html += "  fetch('/close');";
   html += "}";
   html += "function resetSystem() {";
-  html += "fetch('/reset');";
+  html += "  fetch('/reset');";
   html += "}";
   html += "updateStatus();";
-  html += "setInterval(updateStatus, 2000);"; // Update every 2 seconds
+  html += "setInterval(updateStatus, 2000);";
   html += "</script>";
   html += "</body></html>";
   request->send(200, "text/html", html);
 });
 
-// ...
 
 server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
   String status = gateOpen ? "Open" : "Closed";
@@ -261,4 +300,4 @@ void resetSystem() {
     digitalWrite(GREEN_LED, LOW);
     greenLEDOn = false;
   }
-}
+} 
